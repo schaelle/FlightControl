@@ -11,6 +11,8 @@ namespace FlightControl.App
 {
 	public class Program
 	{
+		private const int I2CTimeout = 1000;
+
 		private const byte MPU6050_RA_PWR_MGMT_1 = 0x6B;
 		private const byte MPU6050_RA_PWR_MGMT_2 = 0x6C;
 		private const byte MPU6050_PWR1_DEVICE_RESET_BIT = 7;
@@ -640,14 +642,20 @@ namespace FlightControl.App
 			_motorConfig = new I2CDevice.Configuration(0x40, 400);
 			_imu = new I2CDevice(_imuConfig);
 
-			WriteByte(_imu, _motorConfig, 0, 0);
+			WriteByte(_imu, _motorConfig, 0, 0); // reset
 			Thread.Sleep(5);
 
-			WriteBits(_imu, _motorConfig, 0, 4, 1, 1);
-			WriteByte(_imu, _motorConfig, 0xFE, 11);
-			WriteBits(_imu, _motorConfig, 0, 5, 1, 1);
-			//WriteBits(_imu, _motorConfig, 1, 2, 1, 0);
-			WriteBits(_imu, _motorConfig, 0, 4, 1, 0);
+			WriteBits(_imu, _motorConfig, 0, 4, 1, 1); //disable output
+			WriteByte(_imu, _motorConfig, 0xFE, 121); // PRE_SCALE 11
+			WriteBits(_imu, _motorConfig, 0, 5, 1, 1); // MODE1 autoincrement
+			WriteBits(_imu, _motorConfig, 1, 2, 1, 1); // MODE2 OUTDRV = 0
+			WriteBits(_imu, _motorConfig, 1, 4, 1, 0); // MODE2 INVRT = 1 ???
+			WriteBits(_imu, _motorConfig, 0, 4, 1, 0); // enable output
+
+			UInt16 on = 1;
+			UInt16 off = (ushort)((double)4096 / 20);
+			WriteBytes(_imu, _motorConfig, 0x6, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
+			WriteBytes(_imu, _motorConfig, 0x6 + 4, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
 
 
 			Debug.Print("Resetting MPU6050...");
@@ -950,9 +958,10 @@ namespace FlightControl.App
 				Debug.Print(angle + "\t" + output + "\t" + _pid.Ki);
 				_pwm.Duration = (uint)((1 + output) * PwmPeriode / 20);
 
-				UInt16 on = 0;
-				UInt16 off = (ushort)((double)4096 / 20 * 1.5);
+				UInt16 on = 1;
+				UInt16 off = (ushort)((double)4096 / 20 * 1.6); 
 				WriteBytes(_imu, _motorConfig, 0x6, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
+				WriteBytes(_imu, _motorConfig, 0x6 + 4, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
 
 				_pos++;
 			}
@@ -1049,7 +1058,7 @@ namespace FlightControl.App
 			transactions[0] = I2CDevice.CreateWriteTransaction(new[] { MPU6050_RA_BANK_SEL, (byte)bank });
 
 			dev.Config = config;
-			if (dev.Execute(transactions, 1000) == 0)
+			if (dev.Execute(transactions, I2CTimeout) == 0)
 			{
 				Debug.Print("Failed to perform I2C transaction");
 			}
@@ -1060,7 +1069,7 @@ namespace FlightControl.App
 			transactions[0] = I2CDevice.CreateWriteTransaction(new[] { MPU6050_RA_MEM_START_ADDR, address });
 
 			dev.Config = config;
-			if (dev.Execute(transactions, 1000) == 0)
+			if (dev.Execute(transactions, I2CTimeout) == 0)
 			{
 				Debug.Print("Failed to perform I2C transaction");
 			}
@@ -1073,11 +1082,14 @@ namespace FlightControl.App
 			var buffer = new byte[1];
 			transactions[1] = I2CDevice.CreateReadTransaction(buffer);
 
-			dev.Config = config;
-			if (dev.Execute(transactions, 1000) == 0)
+			lock (dev)
 			{
-				Debug.Print("Failed to perform I2C transaction");
-				return false;
+				dev.Config = config;
+				if (dev.Execute(transactions, I2CTimeout) == 0)
+				{
+					Debug.Print("Failed to perform I2C transaction");
+					return false;
+				}
 			}
 			return buffer[0] > 0;
 		}
@@ -1103,10 +1115,13 @@ namespace FlightControl.App
 			var transactions = new I2CDevice.I2CTransaction[1];
 			transactions[0] = I2CDevice.CreateWriteTransaction(new[] { block, data });
 
-			dev.Config = config;
-			if (dev.Execute(transactions, 1000) == 0)
+			lock (dev)
 			{
-				throw new Exception("Failed to perform I2C transaction");
+				dev.Config = config;
+				if (dev.Execute(transactions, I2CTimeout) == 0)
+				{
+					throw new Exception("Failed to perform I2C transaction");
+				}
 			}
 		}
 
@@ -1117,11 +1132,13 @@ namespace FlightControl.App
 			buffer[0] = block;
 			Array.Copy(data, 0, buffer, 1, data.Length);
 			transactions[0] = I2CDevice.CreateWriteTransaction(buffer);
-
-			dev.Config = config;
-			if (dev.Execute(transactions, 1000) == 0)
+			lock (dev)
 			{
-				throw new Exception("Failed to perform I2C transaction");
+				dev.Config = config;
+				if (dev.Execute(transactions, I2CTimeout) == 0)
+				{
+					throw new Exception("Failed to perform I2C transaction");
+				}
 			}
 		}
 
@@ -1132,10 +1149,13 @@ namespace FlightControl.App
 			var buffer = new byte[length];
 			transactions[1] = I2CDevice.CreateReadTransaction(buffer);
 
-			dev.Config = config;
-			if (dev.Execute(transactions, 1000) == 0)
+			lock (dev)
 			{
-				throw new Exception("Failed to perform I2C transaction");
+				dev.Config = config;
+				if (dev.Execute(transactions, I2CTimeout) == 0)
+				{
+					//throw new Exception("Failed to perform I2C transaction");
+				}
 			}
 			return buffer;
 		}
@@ -1147,19 +1167,22 @@ namespace FlightControl.App
 			var buffer = new byte[1];
 			transactions[1] = I2CDevice.CreateReadTransaction(buffer);
 
-			dev.Config = config;
-			if (dev.Execute(transactions, 1000) == 0)
+			lock (dev)
 			{
-				throw new Exception("Failed to perform I2C transaction");
+				dev.Config = config;
+				if (dev.Execute(transactions, I2CTimeout) == 0)
+				{
+					throw new Exception("Failed to perform I2C transaction");
+				}
+
+				var mask = ((1 << length) - 1) << (bitStart - length + 1);
+				data <<= (bitStart - length + 1); // shift data into correct position
+				data = (byte) (data & mask); // zero all non-important bits in data
+				buffer[0] = (byte) (buffer[0] & ~(mask)); // zero all important bits in existing byte
+				buffer[0] |= data; // combine data with existing byte
+
+				WriteByte(dev, config, block, buffer[0]);
 			}
-
-			var mask = ((1 << length) - 1) << (bitStart - length + 1);
-			data <<= (bitStart - length + 1); // shift data into correct position
-			data = (byte)(data & mask); // zero all non-important bits in data
-			buffer[0] = (byte)(buffer[0] & ~(mask)); // zero all important bits in existing byte
-			buffer[0] |= data; // combine data with existing byte
-
-			WriteByte(dev, config, block, buffer[0]);
 		}
 
 		private static bool WriteProgMemoryBlock(I2CDevice dev, I2CDevice.Configuration config, byte[] data, byte bank = 0, byte address = 0, bool verify = true)
