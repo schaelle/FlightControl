@@ -9,13 +9,13 @@ namespace FlightControl.App
 		private static long _pwmInputTime;
 		private static float[] _pwmInputData = new float[15];
 		private static uint _pwmInputDataPos;
-		private static long _pwmResetDuration = 60000;
+		private static long _pwmResetDuration = 30000;
 
 		public PwmInput(Cpu.Pin pin)
 		{
 			var pwmInput = new InterruptPort(pin, false, Port.ResistorMode.Disabled, Port.InterruptMode.InterruptEdgeBoth);
 			pwmInput.OnInterrupt += PwmInputOnOnInterrupt;
-			pwmInput.EnableInterrupt();
+			//pwmInput.EnableInterrupt();
 		}
 
 		private static void PwmInputOnOnInterrupt(uint data1, uint data2, DateTime time)

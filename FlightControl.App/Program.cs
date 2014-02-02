@@ -497,16 +497,19 @@ namespace FlightControl.App
 		private static double _lastAngle;
 		private static I2CDevice _imu;
 		private static I2CDevice.Configuration _imuConfig;
-		private static PWM _pwm;
+		private static PWM _pwm1;
+		private static PWM _pwm2;
 		private static PidController _pid;
 		private static int _pos;
-		private static FilterButterworth _lowPassFilter;
+		private static Filter _lowPassFilter;
 
 		private const int PwmPeriode = 20000;
 
 		private static SerialPort _gps;
 		private static PwmInput _pwmInput;
 		private static I2CDevice.Configuration _motorConfig;
+		private static int _fifoOffset;
+		private static byte[] _fifoBuffer = new byte[184];
 
 		private static void GpsOnDataReceived(object sender, SerialDataReceivedEventArgs serialDataReceivedEventArgs)
 		{
@@ -526,8 +529,10 @@ namespace FlightControl.App
 
 			_pwmInput = new PwmInput(Pin.PB14);
 
-			_pwm = new PWM(Cpu.PWMChannel.PWM_0, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Microseconds, false);
-			_pwm.Start();
+			_pwm1 = new PWM(Cpu.PWMChannel.PWM_2, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Microseconds, false);
+			_pwm1.Start();
+			_pwm2 = new PWM(Cpu.PWMChannel.PWM_3, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Microseconds, false);
+			_pwm2.Start();
 
 			const double pKrit = -.006;
 			const double tKrit = 2.1;
@@ -538,14 +543,38 @@ namespace FlightControl.App
 			// working i=-.00005 p=-.0012 d=.002
 			_pid = new PidController()
 			{
-				Ki = -.0001,
-				Kp = -.004,
-				Kd = .003,
-				OutputMinimum = 0,
+				//Ki = -.0001,
+				Kp = -.002,
+				Kd = .002,
+				OutputMinimum = -1,
 				OutputMaximum = 1
 			};
 
-			_lowPassFilter = new FilterButterworth(40, 100, FilterButterworth.PassType.Lowpass, 40);
+			//_lowPassFilter = new FilterButterworth(40, 100, FilterButterworth.PassType.Lowpass, 40);
+			_lowPassFilter = new Filter(new[]
+			{
+				-0.000000, 
+-0.008099, 
+0.008097, 
+0.012287, 
+-0.029049, 
+0.000000, 
+0.059868, 
+-0.054766, 
+-0.088350, 
+0.298459, 
+0.600000, 
+0.298459, 
+-0.088350, 
+-0.054766, 
+0.059868, 
+0.000000, 
+-0.029049, 
+0.012287, 
+0.008097, 
+-0.008099, 
+-0.000000
+			});
 
 			/*var uart = new SerialPort("COM4", 38400, Parity.None, 8, StopBits.One);
 			uart.DataReceived += uart_DataReceived;
@@ -639,10 +668,10 @@ namespace FlightControl.App
 
 			_imuConfig = new I2CDevice.Configuration(0x68, 400);
 			var magConfig = new I2CDevice.Configuration(0x0E, 400);
-			_motorConfig = new I2CDevice.Configuration(0x40, 400);
+			//_motorConfig = new I2CDevice.Configuration(0x40, 400);
 			_imu = new I2CDevice(_imuConfig);
 
-			WriteByte(_imu, _motorConfig, 0, 0); // reset
+			/*WriteByte(_imu, _motorConfig, 0, 0); // reset
 			Thread.Sleep(5);
 
 			WriteBits(_imu, _motorConfig, 0, 4, 1, 1); //disable output
@@ -655,7 +684,7 @@ namespace FlightControl.App
 			UInt16 on = 1;
 			UInt16 off = (ushort)((double)4096 / 20);
 			WriteBytes(_imu, _motorConfig, 0x6, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
-			WriteBytes(_imu, _motorConfig, 0x6 + 4, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
+			WriteBytes(_imu, _motorConfig, 0x6 + 4, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });*/
 
 
 			Debug.Print("Resetting MPU6050...");
@@ -709,7 +738,7 @@ namespace FlightControl.App
 					WriteByte(_imu, _imuConfig, MPU6050_RA_INT_ENABLE, 0x12);
 
 					Debug.Print("Setting sample rate to 200Hz...");
-					WriteByte(_imu, _imuConfig, MPU6050_RA_SMPLRT_DIV, 0);// 1khz / (1 + 4) = 200 Hz
+					WriteByte(_imu, _imuConfig, MPU6050_RA_SMPLRT_DIV, 4);// 1khz / (1 + 4) = 200 Hz
 
 					Debug.Print("Setting clock source to Z Gyro...");
 					WriteBits(_imu, _imuConfig, MPU6050_RA_PWR_MGMT_1, MPU6050_PWR1_CLKSEL_BIT, MPU6050_PWR1_CLKSEL_LENGTH, MPU6050_CLOCK_PLL_ZGYRO);
@@ -931,9 +960,13 @@ namespace FlightControl.App
 		static void inter_OnInterrupt(uint data1, uint data2, DateTime time)
 		{
 			var fifoCount = GetFifoCount(_imu, _imuConfig);
-			if (fifoCount >= 46)
+			if (fifoCount >= 48)
 			{
 				var fifo = GetFifoBytes(_imu, _imuConfig, System.Math.Min(fifoCount, 128)); // safeguard only 128 bytes
+
+				if (fifoCount % 48 != 0)
+					return;
+
 				var acc = GetAccel(fifo);
 				var gyro = GetGyro(fifo);
 				var q = GetQuaternion(fifo);
@@ -945,23 +978,32 @@ namespace FlightControl.App
 				//Debug.Print(euler[0] + "\t" + euler[1] + "\t" + euler[2]);
 				//Debug.Print(pitch[0] + "\t" + pitch[1] + "\t" + pitch[2]);
 				//Debug.Print(q.W + "\t" + q.X + "\t" + q.Y + "\t" + q.Z);
+				//Debug.Print(_pwmInput[3].ToString());
 
 				var angle = pitch[2];
-				_lowPassFilter.Update((float)angle);
-				angle = _lowPassFilter.Value;
-				angle += _pwmInput[1] * 30;
+				angle = _lowPassFilter.Input(angle);
+				angle += _pwmInput[1] * 20;
 
-				_pid.Ki = -.0001 - (_pwmInput[5] + 1) * .001;
+				/*_lowPassFilterGyro.Update((float) gyro[0]);
+				var gyroFilter = _lowPassFilterGyro.Value;*/
+
+				_pid.Kd = .001 + (_pwmInput[5]) * .001;
+				//_pid.Kp = -.002 - (_pwmInput[5]) * .002;
 
 				var output = _pid.Compute(angle, gyro[0]);
+				//output = 0;
+				var push = (_pwmInput[2] + 1) / 2;
+				push = (float)(.4 + ((_pwmInput[2] + 1) / 2) * .3);
+				//push = 0;
+				_pwm1.Duration = (uint)((1 + push - output) * PwmPeriode / 20);
+				_pwm2.Duration = (uint)((1 + push + output) * PwmPeriode / 20);
+				Debug.Print(angle + "\t" + gyro[0] + "\t" + fifoCount + "\t" + output + "\tKi=" + _pid.Ki + "\tKp=" + _pid.Kp + "\tKd=" + _pid.Kd + "\tp=" + push);
 
-				Debug.Print(angle + "\t" + output + "\t" + _pid.Ki);
-				_pwm.Duration = (uint)((1 + output) * PwmPeriode / 20);
-
-				UInt16 on = 1;
-				UInt16 off = (ushort)((double)4096 / 20 * 1.6); 
+				/*const ushort on = 1;
+				var off = (ushort)((double)4095 / 20 * (1 + .5 - output) + 1);
 				WriteBytes(_imu, _motorConfig, 0x6, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
-				WriteBytes(_imu, _motorConfig, 0x6 + 4, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });
+				off = (ushort)((double)4095 / 20 * (1 + .5 + output) + 1);
+				WriteBytes(_imu, _motorConfig, 0x6 + 4, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });*/
 
 				_pos++;
 			}
@@ -1006,17 +1048,17 @@ namespace FlightControl.App
 		private static Quaternion GetQuaternion(byte[] packet)
 		{
 			var data = new short[4];
-			data[0] = (short)((packet[0] << 8) + packet[1]);
-			data[1] = (short)((packet[4] << 8) + packet[5]);
-			data[2] = (short)((packet[8] << 8) + packet[9]);
-			data[3] = (short)((packet[12] << 8) + packet[13]);
+			data[0] = (short)((packet[0] << 8) + (packet[1]));
+			data[1] = (short)((packet[4] << 8) + (packet[5]));
+			data[2] = (short)((packet[8] << 8) + (packet[9]));
+			data[3] = (short)((packet[12] << 8) + (packet[13]));
 
 			return new Quaternion
 			{
-				W = data[0] / 16384.0,
-				X = data[1] / 16384.0,
-				Y = data[2] / 16384.0,
-				Z = data[3] / 16384.0
+				W = data[0] / (double)ushort.MaxValue,
+				X = data[1] / (double)ushort.MaxValue,
+				Y = data[2] / (double)ushort.MaxValue,
+				Z = data[3] / (double)ushort.MaxValue
 			};
 		}
 
@@ -1032,9 +1074,9 @@ namespace FlightControl.App
 		private static short[] GetGyro(byte[] packet)
 		{
 			var data = new short[3];
-			data[0] = (short)((packet[16] << 8) + packet[17]);
-			data[1] = (short)((packet[20] << 8) + packet[21]);
-			data[2] = (short)((packet[24] << 8) + packet[25]);
+			data[0] = (short)((packet[16] << 8) + (packet[17]));
+			data[1] = (short)((packet[20] << 8) + (packet[21]));
+			data[2] = (short)((packet[24] << 8) + (packet[25]));
 			return data;
 		}
 
@@ -1177,8 +1219,8 @@ namespace FlightControl.App
 
 				var mask = ((1 << length) - 1) << (bitStart - length + 1);
 				data <<= (bitStart - length + 1); // shift data into correct position
-				data = (byte) (data & mask); // zero all non-important bits in data
-				buffer[0] = (byte) (buffer[0] & ~(mask)); // zero all important bits in existing byte
+				data = (byte)(data & mask); // zero all non-important bits in data
+				buffer[0] = (byte)(buffer[0] & ~(mask)); // zero all important bits in existing byte
 				buffer[0] |= data; // combine data with existing byte
 
 				WriteByte(dev, config, block, buffer[0]);
