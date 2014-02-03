@@ -1,4 +1,4 @@
-namespace FlightControl.App
+namespace FlightControl.App.Filter
 {
 	public class FilterButterworth
 	{

@@ -13,4 +13,8 @@ namespace FlightControl
 	}
 
 	public delegate void OnMeasurementUpdatedHandler(ImuMeasurment msg);
+
+	public class ImuMeasurment
+	{
+	}
 }

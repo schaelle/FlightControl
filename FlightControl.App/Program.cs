@@ -2,6 +2,7 @@
 using System.IO.Ports;
 using System.Text;
 using System.Threading;
+using FlightControl.App.Filter;
 using Gadgeteer.Modules.GHIElectronics;
 using GHI.Hardware.G400;
 using Microsoft.SPOT;
@@ -501,7 +502,8 @@ namespace FlightControl.App
 		private static PWM _pwm2;
 		private static PidController _pid;
 		private static int _pos;
-		private static Filter _lowPassFilter;
+		private static IFilter _lowPassFilter;
+		private static KalmanFilter _kalmanFilter = new KalmanFilter();
 
 		private const int PwmPeriode = 20000;
 
@@ -550,31 +552,9 @@ namespace FlightControl.App
 				OutputMaximum = 1
 			};
 
+			//http://www.arc.id.au/FilterDesign.html
 			//_lowPassFilter = new FilterButterworth(40, 100, FilterButterworth.PassType.Lowpass, 40);
-			_lowPassFilter = new Filter(new[]
-			{
-				-0.000000, 
--0.008099, 
-0.008097, 
-0.012287, 
--0.029049, 
-0.000000, 
-0.059868, 
--0.054766, 
--0.088350, 
-0.298459, 
-0.600000, 
-0.298459, 
--0.088350, 
--0.054766, 
-0.059868, 
-0.000000, 
--0.029049, 
-0.012287, 
-0.008097, 
--0.008099, 
--0.000000
-			});
+			_lowPassFilter = new FirFilter(FirFilter.CalculateFilter(0, 20, 40, 100));
 
 			/*var uart = new SerialPort("COM4", 38400, Parity.None, 8, StopBits.One);
 			uart.DataReceived += uart_DataReceived;
@@ -980,9 +960,12 @@ namespace FlightControl.App
 				//Debug.Print(q.W + "\t" + q.X + "\t" + q.Y + "\t" + q.Z);
 				//Debug.Print(_pwmInput[3].ToString());
 
+
 				var angle = pitch[2];
 				angle = _lowPassFilter.Input(angle);
-				angle += _pwmInput[1] * 20;
+				//angle += _pwmInput[1] * 20;
+
+				var anglaKalman = _kalmanFilter.GetAngle(pitch[2], gyro[0], 1.0 / 100);
 
 				/*_lowPassFilterGyro.Update((float) gyro[0]);
 				var gyroFilter = _lowPassFilterGyro.Value;*/
@@ -997,7 +980,7 @@ namespace FlightControl.App
 				//push = 0;
 				_pwm1.Duration = (uint)((1 + push - output) * PwmPeriode / 20);
 				_pwm2.Duration = (uint)((1 + push + output) * PwmPeriode / 20);
-				Debug.Print(angle + "\t" + gyro[0] + "\t" + fifoCount + "\t" + output + "\tKi=" + _pid.Ki + "\tKp=" + _pid.Kp + "\tKd=" + _pid.Kd + "\tp=" + push);
+				Debug.Print(angle + "\t" + anglaKalman + "\t" + gyro[0] + "\t" + fifoCount + "\t" + output + "\tKi=" + _pid.Ki + "\tKp=" + _pid.Kp + "\tKd=" + _pid.Kd + "\tp=" + push);
 
 				/*const ushort on = 1;
 				var off = (ushort)((double)4095 / 20 * (1 + .5 - output) + 1);
@@ -1071,13 +1054,19 @@ namespace FlightControl.App
 			return data;
 		}
 
-		private static short[] GetGyro(byte[] packet)
+		private static double[] GetGyro(byte[] packet)
 		{
 			var data = new short[3];
 			data[0] = (short)((packet[16] << 8) + (packet[17]));
 			data[1] = (short)((packet[20] << 8) + (packet[21]));
 			data[2] = (short)((packet[24] << 8) + (packet[25]));
-			return data;
+
+			var res = new double[3];
+			for (var i = 0; i < 3; i++)
+			{
+				res[i] = (double)data[i] / short.MaxValue * 2000;
+			}
+			return res;
 		}
 
 		private static short[] GetMag(byte[] packet)

@@ -51,7 +51,6 @@
     <Compile Include="Imu\Android\AndroidImuSensor.cs" />
     <Compile Include="Imu\Android\KalmanFilter.cs" />
     <Compile Include="Imu\IImuSensor.cs" />
-    <Compile Include="Imu\ImuMeasurment.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
