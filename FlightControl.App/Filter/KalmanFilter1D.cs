@@ -1,6 +1,6 @@
 namespace FlightControl.App.Filter
 {
-	public class KalmanFilter
+	public class KalmanFilter1D
 	{
 		/* variables */
 		private readonly double[] _k = new double[2]; // Kalman gain - This is a 2x1 matrix
@@ -19,7 +19,7 @@ namespace FlightControl.App.Filter
 		public double Q { get; set; } // Process noise variance for the accelerometer
 		public double R { get; set; } // Measurement noise variance - this is actually the variance of the measurement noise
 
-		public KalmanFilter()
+		public KalmanFilter1D()
 		{
 			/* We will set the varibles like so, these can also be tuned by the user */
 			Reset();

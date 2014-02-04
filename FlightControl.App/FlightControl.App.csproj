@@ -35,7 +35,9 @@
     <Compile Include="Filter\FirFilter.cs" />
     <Compile Include="Filter\FilterButterworth.cs" />
     <Compile Include="Filter\IFilter.cs" />
-    <Compile Include="Filter\KalmanFilter.cs" />
+    <Compile Include="Filter\KalmanFilter1D.cs" />
+    <Compile Include="Filter\KalmanFilter3D.cs" />
+    <Compile Include="Matrix\Matrix.cs" />
     <Compile Include="PidController.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Program.cs" />
@@ -65,7 +67,5 @@
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Matrix\" />
-  </ItemGroup>
+  <ItemGroup />
 </Project>

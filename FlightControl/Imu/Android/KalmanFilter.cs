@@ -13,17 +13,9 @@ namespace FlightControl.Imu.Android
 		private Matrix<double> _pUpdate;
 		private DiagonalMatrix _h;
 		private DiagonalMatrix _r;
-		private FilterButterworth[] _accFilter = new FilterButterworth[3];
-		private FilterButterworth[] _magFilter = new FilterButterworth[3];
 
 		public KalmanFilter()
 		{
-			for (int i = 0; i < 3; i++)
-			{
-				_accFilter[i] = new FilterButterworth(0.00075, FilterButterworth.PassType.Lowpass, 0);
-				_magFilter[i] = new FilterButterworth(0.06, FilterButterworth.PassType.Lowpass, 0.06 * 2);
-			}
-
 			var var = Math.Sqrt(.0003);
 			_var = new DenseVector(new[] { Math.Pow(var / 180 * Math.PI, 2), Math.Pow(var / 180 * Math.PI, 2), Math.Pow(var / 180 * Math.PI, 2) });
 			_qUpdate = new DenseVector(4);
@@ -69,14 +61,6 @@ namespace FlightControl.Imu.Android
 		{
 			mag = mag.Normalize(2);
 			gyro = gyro / 180 * Math.PI;
-
-			for (int i = 0; i < 3; i++)
-			{
-				_accFilter[i].Update(acc[i]);
-				//acc[i] = _accFilter[i].Value;
-				_magFilter[i].Update(mag[i]);
-				//mag[i] = _magFilter[i].Value;
-			}
 
 			mag = mag.Normalize(2);
 

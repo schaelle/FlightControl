@@ -3,10 +3,12 @@ using System.IO.Ports;
 using System.Text;
 using System.Threading;
 using FlightControl.App.Filter;
+using FlightControl.App.Matrix;
 using Gadgeteer.Modules.GHIElectronics;
 using GHI.Hardware.G400;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Hardware;
+using Math = System.Math;
 
 namespace FlightControl.App
 {
@@ -503,7 +505,7 @@ namespace FlightControl.App
 		private static PidController _pid;
 		private static int _pos;
 		private static IFilter _lowPassFilter;
-		private static KalmanFilter _kalmanFilter = new KalmanFilter();
+		private static KalmanFilter3D _kalmanFilter = new KalmanFilter3D();
 
 		private const int PwmPeriode = 20000;
 
@@ -965,7 +967,10 @@ namespace FlightControl.App
 				angle = _lowPassFilter.Input(angle);
 				//angle += _pwmInput[1] * 20;
 
-				var anglaKalman = _kalmanFilter.GetAngle(pitch[2], gyro[0], 1.0 / 100);
+				var angleKalman = _kalmanFilter.Update(1.0 / 100, new DoubleVector(gyro), new DoubleVector(new[] { q.W, q.X, q.Y, q.Z }));
+				var angleKalmanQ = new Quaternion { W = angleKalman[0], X = angleKalman[1], Y = angleKalman[2], Z = angleKalman[3] };
+				var gravKalman = GetGravity(angleKalmanQ);
+				var pitchKalman = GetYawPitchRoll(angleKalmanQ, gravKalman);
 
 				/*_lowPassFilterGyro.Update((float) gyro[0]);
 				var gyroFilter = _lowPassFilterGyro.Value;*/
@@ -980,7 +985,7 @@ namespace FlightControl.App
 				//push = 0;
 				_pwm1.Duration = (uint)((1 + push - output) * PwmPeriode / 20);
 				_pwm2.Duration = (uint)((1 + push + output) * PwmPeriode / 20);
-				Debug.Print(angle + "\t" + anglaKalman + "\t" + gyro[0] + "\t" + fifoCount + "\t" + output + "\tKi=" + _pid.Ki + "\tKp=" + _pid.Kp + "\tKd=" + _pid.Kd + "\tp=" + push);
+				Debug.Print(angle + "\t" + pitchKalman[2] + "\t" + gyro[0] + "\t" + fifoCount + "\t" + output + "\tKi=" + _pid.Ki + "\tKp=" + _pid.Kp + "\tKd=" + _pid.Kd + "\tp=" + push);
 
 				/*const ushort on = 1;
 				var off = (ushort)((double)4095 / 20 * (1 + .5 - output) + 1);
@@ -1036,13 +1041,15 @@ namespace FlightControl.App
 			data[2] = (short)((packet[8] << 8) + (packet[9]));
 			data[3] = (short)((packet[12] << 8) + (packet[13]));
 
-			return new Quaternion
+			var res = new Quaternion
 			{
 				W = data[0] / (double)ushort.MaxValue,
 				X = data[1] / (double)ushort.MaxValue,
 				Y = data[2] / (double)ushort.MaxValue,
 				Z = data[3] / (double)ushort.MaxValue
 			};
+			res.Normalize();
+			return res;
 		}
 
 		private static short[] GetAccel(byte[] packet)
@@ -1348,6 +1355,16 @@ namespace FlightControl.App
 			public double X;
 			public double Y;
 			public double Z;
+
+			public void Normalize()
+			{
+				var norm = System.Math.Sqrt(W * W + X * X + Y * Y + Z * Z);
+				if (Math.Abs(norm) < 1E-12) return;
+				W = W / norm;
+				X = X / norm;
+				Y = Y / norm;
+				Z = Z / norm;
+			}
 		}
 	}
 }
