@@ -24,8 +24,9 @@ namespace FlightControl.App.Filter
 			_qOsserv = new DoubleVector(4);
 			_qOsserv[0] = 1;
 
-			var sigmaR = new DoubleVector(new[] { 0.01, 0.01, 0.01, 0.01 });
-			_pUpdate = DoubleMatrix.Diagonal(4, .1);
+			var sigmaRValue = 0.01;
+			var sigmaR = new DoubleVector(new[] { sigmaRValue, sigmaRValue, sigmaRValue, sigmaRValue });
+			_pUpdate = DoubleMatrix.Diagonal(4, .01);
 			_h = DoubleMatrix.Diagonal(4, 1);
 			_r = DoubleMatrix.Diagonal(4, sigmaR);
 
@@ -72,10 +73,10 @@ namespace FlightControl.App.Filter
 			f.SetRow(2, f3);
 			f.SetRow(3, f4);
 
-			var qPredict = f * _qUpdate;
+			var qPredicted = f * _qUpdate;
 			var pPredicted = f * _pUpdate * f.Transpose() + _q;
 			var k = pPredicted * _h.Transpose() * (_h * pPredicted * _h.Transpose() + _r).Inverse4();
-			_qUpdate = (qPredict + k * (qObserved - _h * qPredict)).Normalize2();
+			_qUpdate = (qPredicted + k * (qObserved - _h * qPredicted)).Normalize2();
 			_pUpdate = (DoubleMatrix.Diagonal(4, 1) - k * _h) * pPredicted;
 
 			return _qUpdate;

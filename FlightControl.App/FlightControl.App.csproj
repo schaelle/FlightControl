@@ -37,11 +37,14 @@
     <Compile Include="Filter\IFilter.cs" />
     <Compile Include="Filter\KalmanFilter1D.cs" />
     <Compile Include="Filter\KalmanFilter3D.cs" />
+    <Compile Include="I2CExtensions.cs" />
     <Compile Include="Matrix\Matrix.cs" />
+    <Compile Include="MPU6050.cs" />
     <Compile Include="PidController.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="PwmInput.cs" />
+    <Compile Include="Quaternion.cs" />
     <Compile Include="Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
