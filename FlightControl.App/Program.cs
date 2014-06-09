@@ -1,11 +1,9 @@
-﻿using System;
-using System.IO.Ports;
-using System.Text;
+﻿using System.IO.Ports;
 using System.Threading;
 using FlightControl.App.Filter;
 using FlightControl.App.Matrix;
-using Gadgeteer.Modules.GHIElectronics;
-using GHI.Hardware.G400;
+using GHI.Hardware.G120;
+using GHI.Premium.Hardware;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Hardware;
 
@@ -15,8 +13,7 @@ namespace FlightControl.App
 	{
 		private static double _lastAngle;
 		private static I2CDevice _imu;
-		private static PWM _pwm1;
-		private static PWM _pwm2;
+		private static PWM _pwm0, _pwm1, _pwm2, _pwm3;
 		private static PidController _pid;
 		private static int _pos;
 		private static IFilter _lowPassFilter;
@@ -44,13 +41,42 @@ namespace FlightControl.App
 			_gps.Open();
 
 			Thread.Sleep(int.MaxValue);*/
+			Debug.Print("Starting...");
+			Debug.Print("Setup");
 
-			_pwmInput = new PwmInput(Pin.PB14);
+			//_pwmInput = new PwmInput(Pin.PB14);
 
-			_pwm1 = new PWM(Cpu.PWMChannel.PWM_2, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Microseconds, false);
+			//var pwmTest = new OutputPort(Pin.PB12, false);
+
+			var pwm0 = new SignalGenerator(Pin.P3_24, false, 2);
+			pwm0.Set(false, new uint[] { PwmPeriode - PwmPeriode / 20, PwmPeriode / 20 }, 0, 2, true);
+			/*var pwm1 = new SignalGenerator(Pin.PB12, false, 10);
+			pwm1.Set(false, new uint[] { PwmPeriode - PwmPeriode / 20, PwmPeriode / 20 }, 0, 2, true);*/
+			
+			/*_pwm0 = new PWM(Cpu.PWMChannel.PWM_0, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Milliseconds, false); // not
+			_pwm0.Start();
+			_pwm1 = new PWM(Cpu.PWMChannel.PWM_1, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Milliseconds, false); // not
 			_pwm1.Start();
-			_pwm2 = new PWM(Cpu.PWMChannel.PWM_3, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Microseconds, false);
+			_pwm2 = new PWM(Cpu.PWMChannel.PWM_2, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Microseconds, false); // working
 			_pwm2.Start();
+			_pwm3 = new PWM(Cpu.PWMChannel.PWM_3, PwmPeriode, PwmPeriode / 20, PWM.ScaleFactor.Microseconds, false); // working
+			_pwm3.Start();*/
+
+			/*var status = true;
+			while (true)
+			{
+				pwmTest.Write(status);
+				status = !status;
+				Thread.Sleep(20);
+			}*/
+
+			//_pwm0.Duration = (uint)((1 + .9) * PwmPeriode / 20);
+			//_pwm1.Duration = (uint)((1 + .9) * PwmPeriode / 20);
+			//_pwm2.Duration = (uint)((1 + .4) * PwmPeriode / 20);
+			//_pwm3.Duration = (uint)((1 + .4) * PwmPeriode / 20);
+
+			Debug.Print("Started");
+			Thread.Sleep(int.MaxValue);
 
 			const double pKrit = -.006;
 			const double tKrit = 2.1;
@@ -184,7 +210,7 @@ namespace FlightControl.App
 			WriteBytes(_imu, _motorConfig, 0x6 + 4, new[] { (byte)on, (byte)(on >> 8), (byte)off, (byte)(off >> 8) });*/
 
 
-			
+
 
 			/*var start = DateTime.Now;
 			const int interval = 50;

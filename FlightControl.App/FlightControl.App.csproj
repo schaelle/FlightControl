@@ -52,9 +52,10 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Gadgeteer, Version=2.42.0.0, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="GHI.Hardware.G400, Version=4.2.11.1, Culture=neutral, processorArchitecture=MSIL" />
-    <Reference Include="GTM.GHIElectronics.Bluetooth, Version=4.2.101.0, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="GHI.Hardware.G120, Version=4.2.11.1, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="GHI.Premium.Hardware, Version=4.2.11.1, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="GHI.Premium.IO, Version=4.2.11.1, Culture=neutral, processorArchitecture=MSIL" />
+    <Reference Include="GHI.Premium.System, Version=4.2.11.1, Culture=neutral, processorArchitecture=MSIL" />
     <Reference Include="Microsoft.SPOT.Hardware" />
     <Reference Include="Microsoft.SPOT.Hardware.PWM" />
     <Reference Include="Microsoft.SPOT.Hardware.SerialPort" />

@@ -1,6 +1,6 @@
 using System;
 using System.Threading;
-using GHI.Hardware.G400;
+using GHI.Hardware.G120;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Hardware;
 
@@ -698,8 +698,9 @@ namespace FlightControl.App
 			Debug.Print("Enabling DMP");
 			_device.WriteBits(_imuConfig, MPU6050_RA_USER_CTRL, MPU6050_USERCTRL_DMP_EN_BIT, 1, 1);
 
-			var inter = new InterruptPort(Pin.PA26, false, Port.ResistorMode.PullUp, Port.InterruptMode.InterruptEdgeHigh);
-			inter.OnInterrupt += inter_OnInterrupt;
+			//throw new Exception("not impl");
+			/*var inter = new InterruptPort(Pin.PA26, false, Port.ResistorMode.PullUp, Port.InterruptMode.InterruptEdgeHigh);
+			inter.OnInterrupt += inter_OnInterrupt;*/
 		}
 
 		private void inter_OnInterrupt(uint data1, uint data2, DateTime time)

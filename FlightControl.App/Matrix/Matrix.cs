@@ -1,6 +1,4 @@
 using System;
-using Gadgeteer.Modules.GHIElectronics;
-using Microsoft.SPOT;
 
 namespace FlightControl.App.Matrix
 {
